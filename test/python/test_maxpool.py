@@ -13,7 +13,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 # ==============================================================================
-"""nGraph TensorFlow bridge MaxPoolBackprop operation test
+"""nGraph TensorFlow bridge MaxPool operation test
 
 """
 from __future__ import absolute_import
@@ -24,37 +24,22 @@ import pytest
 import numpy as np
 
 import tensorflow as tf
-from tensorflow.python.ops.gen_nn_ops import max_pool_grad
 
 from common import NgraphTest
 
-NHWC_TO_NCHW = (0, 3, 1, 2)
-NCHW_TO_NHWC = (0, 2, 3, 1)
 
-
-class TestMaxPoolBackpropInput(NgraphTest):
+class TestMaxPool(NgraphTest):
+    input_nhwc = np.random.rand(128, 224, 224, 3)
+    ksize_nhwc = [1, 2, 2, 1]
+    strides_nhwc = [1, 1, 1, 1]
 
     @pytest.mark.parametrize("padding", ("VALID", "SAME"))
     def test_nhwc(self, padding):
-        input_nhwc = np.random.rand(128, 224, 224, 3)
-        ksize_nhwc = [1, 2, 2, 1]
-        strides_nhwc = [1, 1, 1, 1]
-        if padding == "VALID":
-            output_nhwc = np.random.rand(128, 223, 223, 3)
-        elif padding == "SAME":
-            output_nhwc = np.random.rand(128, 224, 224, 3)
-
-        grad_nhwc = np.random.rand(128, 224, 224, 3)
-
-        a = max_pool_grad(
-            input_nhwc,
-            output_nhwc,
-            grad_nhwc,
-            ksize_nhwc,
-            strides_nhwc,
-            padding=padding,
-            data_format="NHWC")
-
+        strides = self.strides_nhwc
+        ksize = self.ksize_nhwc
+        input_nhwc = self.input_nhwc
+        a = tf.nn.max_pool(
+            input_nhwc, ksize, strides, padding=padding, data_format="NHWC")
         sess_fn = lambda sess: sess.run(a)
 
         expected = self.without_ngraph(sess_fn)
