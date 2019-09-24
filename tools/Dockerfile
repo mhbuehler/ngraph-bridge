@@ -1,0 +1,63 @@
+# ==============================================================================
+#  Copyright 2019 Intel Corporation
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+# ==============================================================================
+
+ARG http_proxy
+ARG https_proxy
+ARG base_image
+
+FROM $base_image as base
+ARG http_proxy
+ARG https_proxy
+
+RUN git clone https://github.com/tensorflow/ngraph-bridge.git /src/ngraph-bridge
+# RUN git clone https://github.com/NervanaSystems/ngraph.git /src/ngraph
+
+WORKDIR /src/ngraph-bridge
+
+ENV http_proxy=$http_proxy
+ENV https_proxy=$https_proxy
+
+RUN ./build_ngtf.py --use_prebuilt_tensorflow
+
+# Find TensorFlow and NGraph whl files and copy to the /artifacts directory
+RUN mkdir /artifacts && \
+    # export TF_WHL=$(find . -name "tensorflow-*.whl" | tail -1) && \
+    export NGTF_WHL=$(find . -name "ngraph_tensorflow_bridge*.whl" | tail -1) && \
+    # cp $TF_WHL /artifacts && \
+    cp $NGTF_WHL /artifacts && \
+    # echo "Copied $TF_WHL to /artifacts \nCopied $NGTF_WHL to /artifacts"
+    echo "Copied $NGTF_WHL to /artifacts"
+
+FROM ngraph-bridge:base-ubuntu1804-gcc48-py35
+
+ARG http_proxy
+ARG https_proxy
+
+ENV http_proxy=$http_proxy
+ENV https_proxy=$https_proxy
+
+# Copy artifacts from the previous layer
+COPY --from=base /artifacts /artifacts
+
+# Install TensorFlow and NGraph wheels
+# RUN pip3 install `(find /artifacts -name "tensorflow-*.whl" | tail -1)` \
+RUN pip3 install tensorflow \
+    `(find /artifacts -name "ngraph_tensorflow_bridge*.whl" | tail -1)`
+
+# Run python3 by default, since that's where ngraph_bridge and tensorflow are installed
+RUN rm -f /usr/bin/python && ln -s /usr/bin/python3 /usr/bin/python && rm -f /usr/bin/pip && ln -s /usr/bin/pip3 /usr/bin/pip
+
+RUN python -c "import tensorflow as tf; print('TensorFlow version: ',tf.__version__);import ngraph_bridge; print(ngraph_bridge.__version__)"
